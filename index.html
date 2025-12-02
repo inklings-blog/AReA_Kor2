@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AReA 설문 — 바로 응답 및 점수 계산 + 그래프</title>
+<title>미학적 민감도 테스트(AReA)</title>
 <style>
 body{font-family:Inter,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial;margin:0;background:#f6f7fb;color:#0f172a;padding:20px;}
 h1{font-size:20px;margin-bottom:20px;}
@@ -13,12 +13,13 @@ form div{margin-bottom:20px;}
 
 label{font-weight:600;}
 
-/* 선택지 세로 배치 */
-form div > div {  
+/* 선택지 가로 배치 */
+form div > div {
   display: flex;
-  flex-direction: column; 
-  gap: 4px;               
+  flex-direction: row;
+  gap: 12px;
   margin-top: 4px;
+  flex-wrap: wrap;
 }
 
 /* 버튼 가로 정렬 유지 */
@@ -48,7 +49,7 @@ canvas{margin-top:16px;}
 </head>
 <body>
 
-<h1>AReA 설문 — 바로 응답 및 점수 확인</h1>
+<h1>미학적 민감도 테스트(AReA)</h1>
 
 <form id="surveyForm"></form>
 <button id="submitSurvey" type="button">제출</button>
@@ -90,75 +91,102 @@ const items = [
 // Chart.js 초기화
 const ctx = document.getElementById('scoreChart').getContext('2d');
 const scoreChart = new Chart(ctx,{
-  type:'bar',
-  data:{
-    labels:['AA','IAE','CB'],
-    datasets:[{
-      label:'서브스케일 평균',
-      data:[0,0,0],
-      backgroundColor:['#3b82f6','#f97316','#10b981']
-    }]
-  },
-  options:{
-    responsive:true,
-    scales:{y:{beginAtZero:true,max:5}}
-  }
+    type:'bar',
+    data:{
+        labels:['AA','IAE','CB'],
+        datasets:[
+            {label:'서브스케일 평균', data:[0,0,0], backgroundColor:['#3b82f6','#f97316','#10b981']},
+            {label:'전체 평균', type:'line', data:[0,0,0], borderColor:'#facc15', borderWidth:2, fill:false, tension:0.1}
+        ]
+    },
+    options:{
+        indexAxis:'y', // 가로 막대
+        responsive:true,
+        scales:{x:{beginAtZero:true,max:5}},
+        plugins:{legend:{position:'top'}}
+    }
 });
 
-function updateChart(aa, iae, cb){
-  scoreChart.data.datasets[0].data = [aa, iae, cb];
-  scoreChart.update();
+function updateChart(aa, iae, cb, overall){
+    scoreChart.data.datasets[0].data=[aa, iae, cb];
+    scoreChart.data.datasets[1].data=[overall,overall,overall];
+    scoreChart.update();
 }
 
 function renderSurvey(){
-  const min=1,max=5;
-  items.forEach((it,i)=>{
-    const div = document.createElement('div');
-    const label = document.createElement('label');
-    label.textContent = (i+1)+'. '+it.text;
-    label.style.display='block';
-    const row = document.createElement('div'); row.style.display='flex'; row.style.flexDirection='column'; row.style.gap='4px'; row.style.marginTop='4px';
-    for(let v=min; v<=max; v++){
-      const r = document.createElement('label'); r.style.display='inline-flex'; r.style.alignItems='center'; r.style.gap='6px';
-      const inp = document.createElement('input'); inp.type='radio'; inp.name='q'+i; inp.value=v; inp.required=true;
-      r.appendChild(inp); r.appendChild(document.createTextNode(v));
-      row.appendChild(r);
-    }
-    div.appendChild(label); div.appendChild(row);
-    surveyForm.appendChild(div);
-  });
+    const min=1,max=5;
+    items.forEach((it,i)=>{
+        const div = document.createElement('div');
+        const label = document.createElement('label');
+        label.textContent = (i+1)+'. '+it.text;
+        label.style.display='block';
+        const row = document.createElement('div'); 
+        row.style.display='flex'; 
+        row.style.flexDirection='row';
+        row.style.gap='12px';
+        row.style.marginTop='6px';
+        row.style.flexWrap='wrap';
+        for(let v=min; v<=max; v++){
+            const r = document.createElement('label'); 
+            r.style.display='inline-flex'; 
+            r.style.alignItems='center'; 
+            r.style.gap='6px';
+            const inp = document.createElement('input'); 
+            inp.type='radio'; 
+            inp.name='q'+i; 
+            inp.value=v; 
+            inp.required=true;
+            r.appendChild(inp); 
+            r.appendChild(document.createTextNode(v));
+            row.appendChild(r);
+        }
+        div.appendChild(label); 
+        div.appendChild(row);
+        surveyForm.appendChild(div);
+    });
 }
 
 function computeScores(resp){
-  const min=1,max=5;
-  const adjusted = resp.map((r,i)=>items[i].reverse ? (max+min)-r : r);
-  document.getElementById('itemScores').textContent = adjusted.join(', ');
-  const sum = adjusted.reduce((a,b)=>a+b,0);
-  document.getElementById('totalScore').textContent = sum;
-  document.getElementById('meanScore').textContent = (sum/adjusted.length).toFixed(2);
+    const min=1,max=5;
+    const adjusted = resp.map((r,i)=>items[i].reverse ? (max+min)-r : r);
+    document.getElementById('itemScores').textContent = adjusted.join(', ');
+    const sum = adjusted.reduce((a,b)=>a+b,0);
+    const overallMean = (sum/adjusted.length).toFixed(2);
+    document.getElementById('totalScore').textContent = sum;
+    document.getElementById('meanScore').textContent = overallMean;
 
-  const groups={AA:[],IAE:[],CB:[]};
-  items.forEach((it,i)=>{ if(groups[it.subscale]) groups[it.subscale].push(adjusted[i]); });
-  const aaAvg = groups.AA.length ? (groups.AA.reduce((a,b)=>a+b,0)/groups.AA.length).toFixed(2) : 0;
-  const iaeAvg = groups.IAE.length ? (groups.IAE.reduce((a,b)=>a+b,0)/groups.IAE.length).toFixed(2) : 0;
-  const cbAvg = groups.CB.length ? (groups.CB.reduce((a,b)=>a+b,0)/groups.CB.length).toFixed(2) : 0;
-  document.getElementById('aaScore').textContent = aaAvg;
-  document.getElementById('iaeScore').textContent = iaeAvg;
-  document.getElementById('cbScore').textContent = cbAvg;
+    const groups={AA:[],IAE:[],CB:[]};
+    items.forEach((it,i)=>{ if(groups[it.subscale]) groups[it.subscale].push(adjusted[i]); });
+    const aaAvg = groups.AA.length ? (groups.AA.reduce((a,b)=>a+b,0)/groups.AA.length).toFixed(2) : 0;
+    const iaeAvg = groups.IAE.length ? (groups.IAE.reduce((a,b)=>a+b,0)/groups.IAE.length).toFixed(2) : 0;
+    const cbAvg = groups.CB.length ? (groups.CB.reduce((a,b)=>a+b,0)/groups.CB.length).toFixed(2) : 0;
+    document.getElementById('aaScore').textContent = aaAvg;
+    document.getElementById('iaeScore').textContent = iaeAvg;
+    document.getElementById('cbScore').textContent = cbAvg;
 
-  resultsArea.style.display='block';
-  updateChart(Number(aaAvg), Number(iaeAvg), Number(cbAvg));
+    resultsArea.style.display='block';
+    updateChart(Number(aaAvg), Number(iaeAvg), Number(cbAvg), Number(overallMean));
 }
 
 submitSurvey.addEventListener('click', ()=>{
-  const formData = new FormData(surveyForm);
-  const responses = [];
-  for(let i=0;i<items.length;i++){
-    const val = formData.get('q'+i);
-    if(!val){alert('모든 항목에 답해주세요.'); return;}
-    responses.push(Number(val));
-  }
-  computeScores(responses);
+    const formData = new FormData(surveyForm);
+    const responses = [];
+    let firstMissing = null;
+    const allDivs = surveyForm.querySelectorAll('div');
+
+    for(let i=0;i<items.length;i++){
+        const val = formData.get('q'+i);
+        if(!val && firstMissing===null) firstMissing=i;
+        responses.push(val ? Number(val) : null);
+    }
+
+    if(firstMissing !== null){
+        allDivs[firstMissing].scrollIntoView({behavior:'smooth', block:'center'});
+        alert('모든 문항에 답해주세요!');
+        return;
+    }
+
+    computeScores(responses);
 });
 
 renderSurvey();
