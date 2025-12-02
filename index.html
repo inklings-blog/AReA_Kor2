@@ -52,7 +52,7 @@ canvas{margin-top:16px;}
 <h1>미학적 민감도 테스트(AReA)</h1>
 
 <form id="surveyForm"></form>
-<button id="submitSurvey" type="button">제출</button>
+<button id="submitSurvey" type="button">응답완료 & 결과보기 </button>
 
 <div id="resultsArea" style="display:none;">
   <div class="resultRow"><strong>각 항목 점수:</strong><span id="itemScores">—</span></div>
@@ -70,7 +70,7 @@ const surveyForm = document.getElementById('surveyForm');
 const resultsArea = document.getElementById('resultsArea');
 const submitSurvey = document.getElementById('submitSurvey');
 
-// 14개 예시 항목
+// 14개 항목
 const items = [
 {id:1,text:'나는 박물관을 방문하거나 음악/무용 공연을 보러 간다.',subscale:'AA',reverse:false},
 {id:2,text:'나는 예술 작품을 볼 때 아름다움을 알아차린다.',subscale:'AA',reverse:false},
@@ -88,35 +88,7 @@ const items = [
 {id:14,text:'나는 예술 작품을 볼 때 기쁨, 평온함, 또는 그 밖의 긍정적 감정을 경험한다.',subscale:'IAE',reverse:false}
 ];
 
-// Chart.js 초기화
-const ctx = document.getElementById('scoreChart').getContext('2d');
-const scoreChart = new Chart(ctx,{
-    type:'bar',
-    data:{
-        labels:['AA','IAE','CB'],
-        datasets:[
-            {label:'서브스케일 평균', data:[0,0,0], backgroundColor:['#3b82f6','#f97316','#10b981']},
-            {label:'전체 평균', type:'line', data:[0,0,0], borderColor:'#facc15', borderWidth:2, fill:false, tension:0.1}
-        ]
-    },
-     options:{
-        indexAxis:'y',
-        responsive:true,
-        maintainAspectRatio:false,  // 높이 조절 가능
-        layout:{padding: {top:5,bottom:5,left:5,right:5}},
-        scales:{
-            x:{beginAtZero:true,max:5,ticks:{stepSize:1}},
-            y:{ticks:{font:{size:12}}}
-        },
-        plugins:{legend:{position:'top'}}
-    }
-});
-function updateChart(aa, iae, cb, overall){
-    scoreChart.data.datasets[0].data=[aa, iae, cb];
-    scoreChart.data.datasets[1].data=[overall,overall,overall];
-    scoreChart.update();
-}
-
+// 설문 생성
 function renderSurvey(){
     const min=1,max=5;
     items.forEach((it,i)=>{
@@ -125,11 +97,6 @@ function renderSurvey(){
         label.textContent = (i+1)+'. '+it.text;
         label.style.display='block';
         const row = document.createElement('div'); 
-        row.style.display='flex'; 
-        row.style.flexDirection='row';
-        row.style.gap='12px';
-        row.style.marginTop='6px';
-        row.style.flexWrap='wrap';
         for(let v=min; v<=max; v++){
             const r = document.createElement('label'); 
             r.style.display='inline-flex'; 
@@ -149,29 +116,44 @@ function renderSurvey(){
         surveyForm.appendChild(div);
     });
 }
-
-function computeScores(resp){
-    const min=1,max=5;
-    const adjusted = resp.map((r,i)=>items[i].reverse ? (max+min)-r : r);
-    document.getElementById('itemScores').textContent = adjusted.join(', ');
-    const sum = adjusted.reduce((a,b)=>a+b,0);
-    const overallMean = (sum/adjusted.length).toFixed(2);
-    document.getElementById('totalScore').textContent = sum;
-    document.getElementById('meanScore').textContent = overallMean;
-
-    const groups={AA:[],IAE:[],CB:[]};
-    items.forEach((it,i)=>{ if(groups[it.subscale]) groups[it.subscale].push(adjusted[i]); });
-    const aaAvg = groups.AA.length ? (groups.AA.reduce((a,b)=>a+b,0)/groups.AA.length).toFixed(2) : 0;
-    const iaeAvg = groups.IAE.length ? (groups.IAE.reduce((a,b)=>a+b,0)/groups.IAE.length).toFixed(2) : 0;
-    const cbAvg = groups.CB.length ? (groups.CB.reduce((a,b)=>a+b,0)/groups.CB.length).toFixed(2) : 0;
-    document.getElementById('aaScore').textContent = aaAvg;
-    document.getElementById('iaeScore').textContent = iaeAvg;
-    document.getElementById('cbScore').textContent = cbAvg;
-
-    resultsArea.style.display='block';
-    updateChart(Number(aaAvg), Number(iaeAvg), Number(cbAvg), Number(overallMean));
+  // 팝업 창에 결과 표시
+function openResultsPopup(adjusted, aaAvg, iaeAvg, cbAvg, overallMean){
+    const popup = window.open('', 'AReA Results', 'width=500,height=400');
+    const labels = items.map((it,i)=>`<li>${i+1}. ${it.text} → ${adjusted[i]}</li>`).join('');
+    popup.document.write(`
+        <html><head><title>결과</title>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+          body{font-family:Arial;padding:10px;}
+          canvas{margin-top:10px;}
+        </style>
+        </head>
+        <body>
+        <h2>AReA 설문 결과</h2>
+        <ul>${labels}</ul>
+        <p>총합: ${adjusted.reduce((a,b)=>a+b,0)}</p>
+        <p>전체 평균: ${overallMean}</p>
+        <p>AA 평균: ${aaAvg}, IAE 평균: ${iaeAvg}, CB 평균: ${cbAvg}</p>
+        <canvas id="popupChart" width="400" height="120"></canvas>
+        <script>
+          const ctx = document.getElementById('popupChart').getContext('2d');
+          new Chart(ctx,{
+            type:'bar',
+            data:{
+              labels:['AA','IAE','CB'],
+              datasets:[
+                {label:'서브스케일 평균', data:[${aaAvg},${iaeAvg},${cbAvg}], backgroundColor:['#3b82f6','#f97316','#10b981'], barPercentage:0.6, categoryPercentage:0.6},
+                {label:'전체 평균', type:'line', data:[${overallMean},${overallMean},${overallMean}], borderColor:'#facc15', borderWidth:2, fill:false, tension:0.1, pointRadius:3}
+              ]
+            },
+            options:{indexAxis:'y', responsive:true, maintainAspectRatio:false}
+          });
+        <\/script>
+        </body></html>
+    `);
 }
 
+// 제출 이벤트
 submitSurvey.addEventListener('click', ()=>{
     const formData = new FormData(surveyForm);
     const responses = [];
@@ -190,11 +172,22 @@ submitSurvey.addEventListener('click', ()=>{
         return;
     }
 
-    computeScores(responses);
+    // 점수 계산
+    const min=1,max=5;
+    const adjusted = responses.map((r,i)=>items[i].reverse ? (max+min)-r : r);
+    const sum = adjusted.reduce((a,b)=>a+b,0);
+    const overallMean = (sum/adjusted.length).toFixed(2);
+    const groups={AA:[],IAE:[],CB:[]};
+    items.forEach((it,i)=>{ if(groups[it.subscale]) groups[it.subscale].push(adjusted[i]); });
+    const aaAvg = groups.AA.length ? (groups.AA.reduce((a,b)=>a+b,0)/groups.AA.length).toFixed(2) : 0;
+    const iaeAvg = groups.IAE.length ? (groups.IAE.reduce((a,b)=>a+b,0)/groups.IAE.length).toFixed(2) : 0;
+    const cbAvg = groups.CB.length ? (groups.CB.reduce((a,b)=>a+b,0)/groups.CB.length).toFixed(2) : 0;
+
+    // 결과 팝업 표시
+    openResultsPopup(adjusted, aaAvg, iaeAvg, cbAvg, overallMean);
 });
 
 renderSurvey();
 </script>
-
 </body>
 </html>
