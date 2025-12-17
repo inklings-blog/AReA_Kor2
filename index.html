@@ -1,193 +1,96 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>미학적 민감도 테스트(AReA)</title>
-<style>
-body{font-family:Inter,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial;margin:0;background:#f6f7fb;color:#0f172a;padding:20px;}
-h1{font-size:20px;margin-bottom:20px;}
-
-/* 문항 간격 넓게 */
-form div{margin-bottom:20px;} 
-
-label{font-weight:600;}
-
-/* 선택지 가로 배치 */
-form div > div {
-  display: flex;
-  flex-direction: row;
-  gap: 12px;
-  margin-top: 4px;
-  flex-wrap: wrap;
-}
-
-/* 버튼 가로 정렬 유지 */
-button{
-  background:#334155;
-  color:white;
-  border:0;
-  padding:8px 10px;
-  border-radius:8px;
-  cursor:pointer;
-  margin-top:10px;
-  margin-right:8px; /* 버튼 간 가로 간격 */
-}
-
-#resultsArea{
-  margin-top:20px;
-  padding:10px;
-  border:1px solid #eef2f7;
-  border-radius:8px;
-  background:#fbfcff;
-}
-
-.resultRow{margin-bottom:6px;}
-.resultRow strong{margin-right:6px;}
-canvas{margin-top:16px;}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>주간 미션 도장판</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f6f6f6;
+      padding: 40px;
+    }
+    h1 {
+      margin-bottom: 10px;
+    }
+    .mission {
+      background: white;
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+      max-width: 520px;
+      margin-bottom: 30px;
+    }
+    .mission button {
+      margin-top: 16px;
+      padding: 10px 16px;
+      border-radius: 10px;
+      border: none;
+      background: #222;
+      color: white;
+      cursor: pointer;
+      font-size: 15px;
+    }
+    .stamps {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 12px;
+      max-width: 520px;
+    }
+    .day {
+      background: white;
+      border-radius: 16px;
+      height: 80px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    .stamp {
+      position: absolute;
+      font-size: 36px;
+      color: crimson;
+      opacity: 0;
+      transform: rotate(-15deg);
+    }
+    .day.completed .stamp {
+      opacity: 0.85;
+    }
+  </style>
 </head>
 <body>
+  <h1>이번 주 미션</h1>
 
-<h1>미학적 민감도 테스트(AReA)</h1>
+  <div class="mission">
+    <p id="missionText">오늘 해야 할 미션을 완료하세요.</p>
+    <button id="completeBtn">오늘 미션 완료</button>
+  </div>
 
-<form id="surveyForm"></form>
-<button id="submitSurvey" type="button">응답완료 & 결과보기 </button>
+  <div class="stamps" id="stamps"></div>
 
-<div id="resultsArea" style="display:none;">
-  <div class="resultRow"><strong>각 항목 점수:</strong><span id="itemScores">—</span></div>
-  <div class="resultRow"><strong>총합:</strong><span id="totalScore">—</span></div>
-  <div class="resultRow"><strong>전체 평균:</strong><span id="meanScore">—</span></div>
-  <div class="resultRow"><strong>AA 평균:</strong><span id="aaScore">—</span></div>
-  <div class="resultRow"><strong>IAE 평균:</strong><span id="iaeScore">—</span></div>
-  <div class="resultRow"><strong>CB 평균:</strong><span id="cbScore">—</span></div>
-  <canvas id="scoreChart" width="300" height="120"></canvas>
-</div>
+  <script>
+    const days = ["월", "화", "수", "목", "금", "토", "일"];
+    const stampsContainer = document.getElementById("stamps");
+    const button = document.getElementById("completeBtn");
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-const surveyForm = document.getElementById('surveyForm');
-const resultsArea = document.getElementById('resultsArea');
-const submitSurvey = document.getElementById('submitSurvey');
-
-// 14개 항목
-const items = [
-{id:1,text:'나는 박물관을 방문하거나 음악/무용 공연을 보러 간다.',subscale:'AA',reverse:false},
-{id:2,text:'나는 예술 작품을 볼 때 아름다움을 알아차린다.',subscale:'AA',reverse:false},
-{id:3,text:'나는 음악에 의해 감정적으로 크게 움직인다.',subscale:'IAE',reverse:false},
-{id:4,text:'예술 작품을 볼 때, 나는 그 조화로움에 감탄한다.',subscale:'AA',reverse:false},
-{id:5,text:'나는 조각, 회화, 드로잉, 영화 연출 또는 디자인 작업을 한다.',subscale:'CB',reverse:false},
-{id:6,text:'나는 예술 작품을 볼 때 긍정적인 에너지나 활력을 느낀다.',subscale:'IAE',reverse:false},
-{id:7,text:'나는 시나 소설을 쓴다.',subscale:'CB',reverse:false},
-{id:8,text:'나는 예술 작품을 볼 때 심장이 빨리 뛰거나, 땀이 나거나, 어지럽거나, 그 밖의 신체적 반응을 경험한다.',subscale:'IAE',reverse:false},
-{id:9,text:'나는 건축물의 시각적 디자인을 감상한다.',subscale:'CB',reverse:false},
-{id:10,text:'나는 현재(또는 과거에) 미술, 창작 글쓰기, 또는 미학 관련 수업을 듣고 있다(또는 들은 적이 있다).',subscale:'AA',reverse:false},
-{id:11,text:'나는 예술 작품을 볼 때 경외감, 두려움, 혹은 압도되는 감정을 느낀다.',subscale:'IAE',reverse:false},
-{id:12,text:'나는 예술 작품을 감상할 때 우주/자연/존재/신성과 하나가 된 듯한 일체감이나 연결감을 느낀다.',subscale:'IAE',reverse:false},
-{id:13,text:'나는 예술 작품을 볼 때 깊이 감동받는다.',subscale:'AA',reverse:false},
-{id:14,text:'나는 예술 작품을 볼 때 기쁨, 평온함, 또는 그 밖의 긍정적 감정을 경험한다.',subscale:'IAE',reverse:false}
-];
-
-// 설문 생성
-function renderSurvey(){
-    const min=1,max=5;
-    items.forEach((it,i)=>{
-        const div = document.createElement('div');
-        const label = document.createElement('label');
-        label.textContent = (i+1)+'. '+it.text;
-        label.style.display='block';
-        const row = document.createElement('div'); 
-        for(let v=min; v<=max; v++){
-            const r = document.createElement('label'); 
-            r.style.display='inline-flex'; 
-            r.style.alignItems='center'; 
-            r.style.gap='6px';
-            const inp = document.createElement('input'); 
-            inp.type='radio'; 
-            inp.name='q'+i; 
-            inp.value=v; 
-            inp.required=true;
-            r.appendChild(inp); 
-            r.appendChild(document.createTextNode(v));
-            row.appendChild(r);
-        }
-        div.appendChild(label); 
-        div.appendChild(row);
-        surveyForm.appendChild(div);
+    days.forEach(day => {
+      const div = document.createElement("div");
+      div.className = "day";
+      div.innerHTML = `${day}<div class=\"stamp\">✓</div>`;
+      stampsContainer.appendChild(div);
     });
-}
-  // 팝업 창에 결과 표시
-function openResultsPopup(adjusted, aaAvg, iaeAvg, cbAvg, overallMean){
-    const popup = window.open('', 'AReA Results', 'width=500,height=400');
-    const labels = items.map((it,i)=>`<li>${i+1}. ${it.text} → ${adjusted[i]}</li>`).join('');
-    popup.document.write(`
-        <html><head><title>결과</title>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <style>
-          body{font-family:Arial;padding:10px;}
-          canvas{margin-top:10px;}
-        </style>
-        </head>
-        <body>
-        <h2>AReA 설문 결과</h2>
-        <ul>${labels}</ul>
-        <p>총합: ${adjusted.reduce((a,b)=>a+b,0)}</p>
-        <p>전체 평균: ${overallMean}</p>
-        <p>AA 평균: ${aaAvg}, IAE 평균: ${iaeAvg}, CB 평균: ${cbAvg}</p>
-        <canvas id="popupChart" width="400" height="120"></canvas>
-        <script>
-          const ctx = document.getElementById('popupChart').getContext('2d');
-          new Chart(ctx,{
-            type:'bar',
-            data:{
-              labels:['AA','IAE','CB'],
-              datasets:[
-                {label:'서브스케일 평균', data:[${aaAvg},${iaeAvg},${cbAvg}], backgroundColor:['#3b82f6','#f97316','#10b981'], barPercentage:0.6, categoryPercentage:0.6},
-                {label:'전체 평균', type:'line', data:[${overallMean},${overallMean},${overallMean}], borderColor:'#facc15', borderWidth:2, fill:false, tension:0.1, pointRadius:3}
-              ]
-            },
-            options:{indexAxis:'y', responsive:true, maintainAspectRatio:false}
-          });
-        <\/script>
-        </body></html>
-    `);
-}
 
-// 제출 이벤트
-submitSurvey.addEventListener('click', ()=>{
-    const formData = new FormData(surveyForm);
-    const responses = [];
-    let firstMissing = null;
-    const allDivs = surveyForm.querySelectorAll('div');
+    button.addEventListener("click", () => {
+      const today = new Date().getDay(); // 0(일)~6(토)
+      const index = today === 0 ? 6 : today - 1; // 월=0
+      const dayDiv = stampsContainer.children[index];
 
-    for(let i=0;i<items.length;i++){
-        const val = formData.get('q'+i);
-        if(!val && firstMissing===null) firstMissing=i;
-        responses.push(val ? Number(val) : null);
-    }
-
-    if(firstMissing !== null){
-        allDivs[firstMissing].scrollIntoView({behavior:'smooth', block:'center'});
-        alert('모든 문항에 답해주세요!');
-        return;
-    }
-
-    // 점수 계산
-    const min=1,max=5;
-    const adjusted = responses.map((r,i)=>items[i].reverse ? (max+min)-r : r);
-    const sum = adjusted.reduce((a,b)=>a+b,0);
-    const overallMean = (sum/adjusted.length).toFixed(2);
-    const groups={AA:[],IAE:[],CB:[]};
-    items.forEach((it,i)=>{ if(groups[it.subscale]) groups[it.subscale].push(adjusted[i]); });
-    const aaAvg = groups.AA.length ? (groups.AA.reduce((a,b)=>a+b,0)/groups.AA.length).toFixed(2) : 0;
-    const iaeAvg = groups.IAE.length ? (groups.IAE.reduce((a,b)=>a+b,0)/groups.IAE.length).toFixed(2) : 0;
-    const cbAvg = groups.CB.length ? (groups.CB.reduce((a,b)=>a+b,0)/groups.CB.length).toFixed(2) : 0;
-
-    // 결과 팝업 표시
-    openResultsPopup(adjusted, aaAvg, iaeAvg, cbAvg, overallMean);
-});
-
-renderSurvey();
-</script>
+      dayDiv.classList.add("completed");
+      button.disabled = true;
+      button.textContent = "오늘 미션 완료됨";
+    });
+  </script>
 </body>
 </html>
